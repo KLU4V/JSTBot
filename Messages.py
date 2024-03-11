@@ -43,6 +43,19 @@ class JSTBotCL(discord.Client):
         if message.content.startswith("$banwords add"):
             try:
                 ban_words.append(message.content.split('$banwords add ')[1])
+                await message.channel.send(
+                    f'Successfully added a new ban word: {message.content.split('$banwords add ')[1]}')
+                checkable = False
+            except Exception as e:
+                print(e)
+
+        if message.content.startswith("$banwords multiply add"):
+            try:
+                to_add = message.content.split('$banwords add ')[1].split(' ')
+                for word in to_add:
+                    ban_words.append(word)
+                await message.channel.send(
+                    f'Successfully added new ban words')
                 checkable = False
             except Exception as e:
                 print(e)
@@ -53,6 +66,8 @@ class JSTBotCL(discord.Client):
                     await message.channel.send('This word is not in banwords.')
                 else:
                     ban_words.pop(ban_words.index(message.content.split('$banwords remove ')[1]))
+                    await message.channel.send(
+                        f'Successfully removed a ban word: {message.content.split('$banwords remove ')[1]}')
                 checkable = False
             except Exception as e:
                 print(e)

@@ -1,9 +1,11 @@
 import asyncio
 import discord
 from discord.ext import commands
-import random, logging
+import logging
 from config import settings
 from discord.utils import get
+from youtubesearchpython import *
+from youtubesearchpython import VideosSearch
 import yt_dlp
 
 logger = logging.getLogger('discord')
@@ -66,7 +68,7 @@ class JSTBotMusic(commands.Cog):
             print(e)
 
     @commands.command(name='play', brief="Plays a single video, from a youtube URL")
-    async def play(self, ctx, url):
+    async def play(self, ctx, request):
         try:
             channel = ctx.author.voice.channel
             voice_client = await channel.connect()
@@ -75,15 +77,26 @@ class JSTBotMusic(commands.Cog):
             print(e)
 
         try:
+            if request[:5] != 'https':
+                song_info = CustomSearch(request, VideoSortOrder.viewCount, limit=1)
+                link = song_info.result()['result'][0]['link']
+                name = song_info.result()['result'][0]['title']
+                duration = song_info.result()['result'][0]['accessibility']['duration']
+
+            else:
+                song_info = Video.getInfo(request, mode=ResultMode.json)
+                link = request
+                name = song_info['result'][0]['title']
+                duration = song_info['result'][0]['accessibility']['duration']
 
             loop = asyncio.get_event_loop()
-            data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(url, download=False))
+            data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
 
             song = data['url']
             player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options, executable='C:/Path_Programms/ffmpeg.exe')
 
             self.voice_clients[ctx.guild.id].play(player)
-            await ctx.send("Playing")
+            await ctx.send(f"Playing {name}\nDuration: {duration}")
 
         except Exception as e:
             print(e)
