@@ -39,10 +39,31 @@ class JSTBotMusic(commands.Cog):
     yt_dl_options = {"format": "bestaudio/best"}
     ytdl = yt_dlp.YoutubeDL(yt_dl_options)
 
-    ffmpeg_options = {'options': '-vn'}
+    ffmpeg_options = {'before_options': '-reconnect 1',
+                      'options': '-vn'}
+    playlist = list()
 
     def __init__(self, bot):
         self.bot = bot
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+
+        if not member.id == self.bot.user.id:
+            return
+
+        elif before.channel is None:
+            voice = after.channel.guild.voice_client
+            time = 0
+            while True:
+                await asyncio.sleep(1)
+                time = time + 1
+                if voice.is_playing() and not voice.is_paused():
+                    time = 0
+                if time == 300:
+                    await voice.disconnect()
+                if not voice.is_connected():
+                    break
 
     @commands.command(name='say_hello')
     async def say_helo(self, ctx):
@@ -123,6 +144,17 @@ class JSTBotMusic(commands.Cog):
     async def stop(self, ctx):
         try:
             self.voice_clients[ctx.guild.id].stop()
+            self.playlist.clear()
+            await ctx.send("Stopping ")
+
+        except Exception as e:
+            print(e)
+
+    @commands.command(name='play clear', brief="Clears the playlist")
+    async def play_clear(self, ctx):
+        try:
+            self.playlist.clear()
+
             await ctx.send("Stopping ")
 
         except Exception as e:
