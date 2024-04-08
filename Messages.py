@@ -13,10 +13,17 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 
 ban_words = list()
-roles = {'default': '', 'admin': '', 'available': []}
+roles = {'default': '', 'admin': '', 'additional': []}
+welcome_message = f'Привет!'
 
 
 class JSTBotCL(discord.Client):
+    voice_clients = {}
+    yt_dl_options = {"format": "bestaudio/best"}
+    ytdl = yt_dlp.YoutubeDL(yt_dl_options)
+
+    ffmpeg_options = {'options': '-vn'}
+
     async def on_ready(self):
         logger.info(f'{self.user} has connected to Discord!')
         for guild in self.guilds:
@@ -25,9 +32,14 @@ class JSTBotCL(discord.Client):
                 f'{guild.name}(id: {guild.id})')
 
     async def on_member_join(self, member):
+        global welcome_message
+
         await member.create_dm()
-        await member.dm_channel.send(f'Привет, {member.name}!')
-        await member.add_roles(discord.utils.get(member.guild.roles, name=roles['default']))
+        await member.dm_channel.send(welcome_message)
+        try:
+            await member.add_roles(discord.utils.get(member.guild.roles, name=roles['default']))
+        except Exception as e:
+            print(e)
 
     async def on_message(self, message):
         global ban_words, roles
@@ -101,15 +113,44 @@ class JSTBotCL(discord.Client):
             # roles sector start
             if message.content.startswith("$roles default set"):
                 try:
+                    guild = message.guild
+                    server_roles = [role.name for role in guild.roles]
+
                     roles['default'] = message.content.split("$roles default set ")[1]
-                    await message.channel.send(f'Default role: ' + roles['default'])
+                    if roles['default'] in server_roles:
+                        await message.channel.send(f'Default role: ' + roles['default'])
+                    else:
+                        roles['default'] = ''
+                        await message.channel.send('This role does not exist')
                 except Exception as e:
                     print(e)
 
             if message.content.startswith("$roles admin set"):
                 try:
+                    guild = message.guild
+                    server_roles = [role.name for role in guild.roles]
+
                     roles['admin'] = message.content.split("$roles admin set ")[1]
-                    await message.channel.send(f'Admin role: ' + roles['admin'])
+                    if roles['admin'] in server_roles:
+                        await message.channel.send(f'Admin role: ' + roles['admin'])
+                    else:
+                        roles['admin'] = ''
+                        await message.channel.send('This role does not exist')
+                except Exception as e:
+                    print(e)
+
+            if message.content.startswith("$roles additional add"):
+                try:
+                    guild = message.guild
+                    server_roles = [role.name for role in guild.roles]
+
+                    roles['additional'].append(message.content.split("$roles additional add ")[1])
+                    if message.content.split("$roles additional add ")[1] in server_roles:
+                        await message.channel.send(
+                            f'Added an additional role: ' + message.content.split("$roles additional add ")[1])
+                    else:
+                        roles['additional'].pop(-1)
+                        await message.channel.send('This role does not exist')
                 except Exception as e:
                     print(e)
 
