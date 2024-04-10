@@ -6,6 +6,7 @@ from config import settings
 from discord.utils import get
 from youtubesearchpython import *
 from youtubesearchpython import VideosSearch
+import time
 import yt_dlp
 
 logger = logging.getLogger('discord')
@@ -41,7 +42,8 @@ class JSTBotMusic(commands.Cog):
 
     ffmpeg_options = {'before_options': '-reconnect 1',
                       'options': '-vn'}
-    playlist = list()
+
+    playlist, paused, duration, cur_name = list(), False, 0, None
 
     def __init__(self, bot):
         self.bot = bot
@@ -95,70 +97,118 @@ class JSTBotMusic(commands.Cog):
             voice_client = await channel.connect()
             self.voice_clients[voice_client.guild.id] = voice_client
         except Exception as e:
-            print(e)
+            print(f'[play] {e}')
 
         try:
             if request[:5] != 'https':
                 song_info = CustomSearch(request, VideoSortOrder.viewCount, limit=1)
                 link = song_info.result()['result'][0]['link']
-                name = song_info.result()['result'][0]['title']
-                duration = song_info.result()['result'][0]['accessibility']['duration']
+
+                self.playlist.append(link)
+
+            elif request[:5] == 'https' and 'list' in request:
+                playlistVideos = Playlist.getVideos(request)
+
+                for i in range(len(playlistVideos['videos'])):
+                    self.playlist.append(playlistVideos['videos'][i]['link'])
 
             else:
-                song_info = Video.getInfo(request, mode=ResultMode.json)
                 link = request
-                name = song_info['result'][0]['title']
-                duration = song_info['result'][0]['accessibility']['duration']
 
-            loop = asyncio.get_event_loop()
-            data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
+                self.playlist.append(link)
 
-            song = data['url']
-            player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options, executable='C:/Path_Programms/ffmpeg.exe')
+            if len(self.playlist) == 1 and not ctx.voice_client.is_playing():
+                link = self.playlist[0]
+                song_info = Video.getInfo(link, mode=ResultMode.json)
+                self.cur_name = song_info['title']
 
-            self.voice_clients[ctx.guild.id].play(player)
-            await ctx.send(f"Playing {name}\nDuration: {duration}")
+                self.duration = int(song_info['duration']['secondsText'])
+
+
+                loop = asyncio.get_event_loop()
+                data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
+
+                song = data['url']
+                player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options, executable='C:/Path_Programms/ffmpeg.exe')
+                self.voice_clients[ctx.guild.id].play(player)
+
+                convformat = time.strftime("%M:%S", time.gmtime(self.duration))
+                await ctx.send(f":cd: Playing> {self.cur_name}\n{convformat}")
+
+            else:
+                await ctx.send(f":cd: Queued> {link}")
+
+            while True:
+                if self.paused is False and not ctx.voice_client.is_playing():
+                    self.playlist.pop(0)
+
+                    try:
+                        link = self.playlist[0]
+                        song_info = Video.getInfo(link, mode=ResultMode.json)
+                        self.cur_name = song_info['title']
+                        self.duration = int(song_info['duration']['secondsText'])
+
+                        loop = asyncio.get_event_loop()
+                        data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
+
+                        song = data['url']
+                        player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options,
+                                                        executable='C:/Path_Programms/ffmpeg.exe')
+                        self.voice_clients[ctx.guild.id].play(player)
+
+                        convformat = time.strftime("%M:%S", time.gmtime(self.duration))
+                        await ctx.send(f":cd: Playing> {self.cur_name}\n{convformat}")
+
+                    except Exception as e:
+                        print(f'[play] {e}')
+                        break
+
+                else:
+                    await asyncio.sleep(1)
 
         except Exception as e:
-            print(e)
+            print(f'[play] {e}')
 
     @commands.command(name='pause', brief="Pauses a song")
     async def pause(self, ctx):
         try:
             self.voice_clients[ctx.guild.id].pause()
-            await ctx.send("Pausing")
+            self.paused = True
+
+            await ctx.send(f":cd: Paused> {self.cur_name}")
 
         except Exception as e:
-            print(e)
+            print(f'[pause] {e}')
 
     @commands.command(name='resume', brief="Resumes a song")
     async def resume(self, ctx):
         try:
             self.voice_clients[ctx.guild.id].resume()
-            await ctx.send("Resuming")
+            self.paused = False
+
+            await ctx.send(f":cd: Resumed> {self.cur_name}")
 
         except Exception as e:
-            print(e)
+            print(f'[resume] {e}')
 
-    @commands.command(name='stop', brief="Resumes a song")
-    async def stop(self, ctx):
-        try:
-            self.voice_clients[ctx.guild.id].stop()
-            self.playlist.clear()
-            await ctx.send("Stopping ")
-
-        except Exception as e:
-            print(e)
-
-    @commands.command(name='play clear', brief="Clears the playlist")
-    async def play_clear(self, ctx):
+    @commands.command(name='playlist.clear', brief="Clears the playlist")
+    async def playlist_clear(self, ctx):
         try:
             self.playlist.clear()
+            self.paused = False
 
-            await ctx.send("Stopping ")
+            await ctx.send("Playlist has been cleared")
 
         except Exception as e:
-            print(e)
+            print(f'[playlist_clear] {e}')
+
+    @commands.command(name='playlist.show', brief="Shows the playlist")
+    async def playlist_show(self, ctx):
+        try:
+            await ctx.send(self.playlist)
+
+        except Exception as e:
+            print(f'[playlist_show] {e}')
 
 
 async def main():
