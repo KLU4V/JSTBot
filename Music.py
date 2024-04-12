@@ -43,7 +43,9 @@ class JSTBotMusic(commands.Cog):
     ffmpeg_options = {'before_options': '-reconnect 1',
                       'options': '-vn'}
 
-    playlist, paused, duration, cur_name = list(), False, 0, None
+    paused, duration, skipnumber, loop = False, 0, 0, 0
+    queue, history = list(), list()
+    current_song = {'name': None, 'duration': 0, 'link': None}
 
     def __init__(self, bot):
         self.bot = bot
@@ -69,7 +71,7 @@ class JSTBotMusic(commands.Cog):
 
     @commands.command(name='say_hello')
     async def say_helo(self, ctx):
-        await ctx.send('hello')
+        await ctx.send('`hello`')
 
     @commands.command(name='connect', brief="Connects to the voice channel")
     async def connect(self, ctx):
@@ -77,7 +79,7 @@ class JSTBotMusic(commands.Cog):
             channel = ctx.author.voice.channel
             voice_client = await channel.connect()
             self.voice_clients[ctx.guild.id] = voice_client
-            await ctx.send("JSTBot has connected to the voice channel.")
+            await ctx.send("`JSTBot has connected to the voice channel.`")
         except Exception as e:
             print(e)
 
@@ -86,11 +88,11 @@ class JSTBotMusic(commands.Cog):
         try:
             self.voice_clients[ctx.guild.id].stop()
             await self.voice_clients[ctx.guild.id].disconnect()
-            await ctx.send("JSTBot has disconnected from the voice channel.")
+            await ctx.send("`JSTBot has disconnected from the voice channel.`")
         except Exception as e:
             print(e)
 
-    @commands.command(name='play', brief="Plays a single video, from a youtube URL")
+    @commands.command(name='play', brief="Plays a single video or adds a video to the playlist, from a youtube URL")
     async def play(self, ctx, request):
         try:
             channel = ctx.author.voice.channel
@@ -100,67 +102,95 @@ class JSTBotMusic(commands.Cog):
             print(f'[play] {e}')
 
         try:
-            if request[:5] != 'https':
-                song_info = CustomSearch(request, VideoSortOrder.viewCount, limit=1)
-                link = song_info.result()['result'][0]['link']
-
-                self.playlist.append(link)
-
-            elif request[:5] == 'https' and 'list' in request:
+            if request[:5] == 'https' and 'playlist' in request:
                 playlistVideos = Playlist.getVideos(request)
 
                 for i in range(len(playlistVideos['videos'])):
-                    self.playlist.append(playlistVideos['videos'][i]['link'])
+                    self.queue.append(Video.getInfo(playlistVideos['videos'][i]['link'], mode=ResultMode.json)['link'])
+
+                link = self.queue[0]
+
+            elif request[:5] != 'https':
+                song_info = CustomSearch(request, VideoSortOrder.relevance, limit=1)
+                link = song_info.result()['result'][0]['link']
+
+                self.queue.append(link)
 
             else:
                 link = request
 
-                self.playlist.append(link)
+                self.queue.append(link)
 
-            if len(self.playlist) == 1 and not ctx.voice_client.is_playing():
-                link = self.playlist[0]
-                song_info = Video.getInfo(link, mode=ResultMode.json)
-                self.cur_name = song_info['title']
+            if not ctx.voice_client.is_playing():
+                try:
+                    link = self.queue[0]
+                    song_info = Video.getInfo(link, mode=ResultMode.json)
 
-                self.duration = int(song_info['duration']['secondsText'])
+                    self.current_song['name'] = song_info['title']
+                    self.duration = int(song_info['duration']['secondsText'])
+                    self.current_song['link'] = link
+                    self.history.insert(0, self.current_song['link'])
 
+                    loop = asyncio.get_event_loop()
+                    data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
 
-                loop = asyncio.get_event_loop()
-                data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
+                    song = data['url']
+                    player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options,
+                                                    executable='C:/Path_Programms/ffmpeg.exe')
+                    self.voice_clients[ctx.guild.id].play(player)
 
-                song = data['url']
-                player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options, executable='C:/Path_Programms/ffmpeg.exe')
-                self.voice_clients[ctx.guild.id].play(player)
+                    self.current_song['duration'] = time.strftime("%M:%S", time.gmtime(self.duration))
+                    await ctx.send(f"`📀Playing> {self.current_song['name']}`\n`📀Duration> {self.current_song['duration']}`")
 
-                convformat = time.strftime("%M:%S", time.gmtime(self.duration))
-                await ctx.send(f":cd: Playing> {self.cur_name}\n{convformat}")
+                except Exception as e:
+                    print(f'[play_player] {e}')
 
             else:
-                await ctx.send(f":cd: Queued> {link}")
+                await ctx.send(f"`📀Queued> {link}`")
 
             while True:
-                if self.paused is False and not ctx.voice_client.is_playing():
-                    self.playlist.pop(0)
+                if self.paused is False and not ctx.voice_client.is_playing() and self.skipnumber == 0:
+                    self.queue.pop(0)
 
                     try:
-                        link = self.playlist[0]
+                        link = self.queue[0]
                         song_info = Video.getInfo(link, mode=ResultMode.json)
-                        self.cur_name = song_info['title']
+
+                        self.current_song['name'] = song_info['title']
                         self.duration = int(song_info['duration']['secondsText'])
+                        self.current_song['link'] = link
+                        self.history.insert(0, self.current_song['link'])
 
                         loop = asyncio.get_event_loop()
-                        data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
+                        data = await loop.run_in_executor(None,
+                                                          lambda: self.ytdl.extract_info(link, download=False))
 
                         song = data['url']
                         player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options,
                                                         executable='C:/Path_Programms/ffmpeg.exe')
                         self.voice_clients[ctx.guild.id].play(player)
 
-                        convformat = time.strftime("%M:%S", time.gmtime(self.duration))
-                        await ctx.send(f":cd: Playing> {self.cur_name}\n{convformat}")
+                        self.current_song['duration'] = time.strftime("%M:%S", time.gmtime(self.duration))
+                        await ctx.send(
+                            f"`📀Playing> {self.current_song['name']}`\n`📀Duration> {self.current_song['duration']}`")
 
                     except Exception as e:
-                        print(f'[play] {e}')
+                        print(f'[play_player] {e}')
+                        break
+
+                elif self.skipnumber >= 1:
+                    try:
+                        self.voice_clients[ctx.guild.id].stop()
+                        await ctx.send(f"`📀Skipped> {self.current_song['name']}`")
+                        for s in range(self.skipnumber - 1):
+                            await ctx.send(f"`📀Skipped> {Video.getInfo(link, mode=ResultMode.json)['title']}`")
+                            self.history.insert(0, link)
+                            self.queue.pop(0)
+
+                        self.skipnumber = 0
+
+                    except Exception as e:
+                        print(f'[play_skip] {e}')
                         break
 
                 else:
@@ -175,7 +205,7 @@ class JSTBotMusic(commands.Cog):
             self.voice_clients[ctx.guild.id].pause()
             self.paused = True
 
-            await ctx.send(f":cd: Paused> {self.cur_name}")
+            await ctx.send(f"`📀Paused> {self.current_song['name']}`")
 
         except Exception as e:
             print(f'[pause] {e}')
@@ -186,29 +216,102 @@ class JSTBotMusic(commands.Cog):
             self.voice_clients[ctx.guild.id].resume()
             self.paused = False
 
-            await ctx.send(f":cd: Resumed> {self.cur_name}")
+            await ctx.send(f"`📀Resumed> {self.current_song['name']}`")
 
         except Exception as e:
             print(f'[resume] {e}')
 
-    @commands.command(name='playlist.clear', brief="Clears the playlist")
-    async def playlist_clear(self, ctx):
+    @commands.command(name='queue.clear', brief="Clears the playlist")
+    async def queue_clear(self, ctx):
         try:
-            self.playlist.clear()
+            self.queue.clear()
             self.paused = False
 
-            await ctx.send("Playlist has been cleared")
+            await ctx.send("`Playlist has been cleared`")
 
         except Exception as e:
             print(f'[playlist_clear] {e}')
 
-    @commands.command(name='playlist.show', brief="Shows the playlist")
-    async def playlist_show(self, ctx):
+    @commands.command(name='queue.show', brief="Shows the playlist")
+    async def queue_show(self, ctx):
         try:
-            await ctx.send(self.playlist)
+            text = ""
+            for s in self.queue:
+                text += f'`📀{Video.getInfo(s, mode=ResultMode.json)['title']}`\n'
+            await ctx.send(text)
 
         except Exception as e:
             print(f'[playlist_show] {e}')
+
+    @commands.command(name='nowplaying', brief="Shows a current song")
+    async def nowplaying(self, ctx):
+        try:
+            await ctx.send(f'`📀Playing> {self.current_song['name']}`\n`📀Duration> {self.current_song['duration']}`')
+
+        except Exception as e:
+            print(f'[nowplaying] {e}')
+
+    @commands.command(name='stop', brief="Stops a song")
+    async def stop(self, ctx):
+        try:
+            self.voice_clients[ctx.guild.id].stop()
+            self.queue.clear()
+            self.paused = False
+
+            await ctx.send("`Stopped`")
+        except Exception as e:
+            print(e)
+
+    @commands.command(name='skipn', brief="Skips number of songs")
+    async def skipn(self, ctx, n=1):
+        try:
+            self.skipnumber = n
+
+        except Exception as e:
+            print(f'[skip] {e}')
+
+    @commands.command(name='skip', brief="Skips a single song")
+    async def skip(self, ctx):
+        try:
+            self.skipnumber = 1
+
+        except Exception as e:
+            print(f'[skip] {e}')
+
+    @commands.command(name='history', brief="Shows the history of songs")
+    async def show_history(self, ctx):
+        try:
+            text = ""
+            print(self.history)
+            for s in self.history:
+                text += f'`📀{Video.getInfo(s, mode=ResultMode.json)['title']}`\n'
+            await ctx.send(text)
+
+        except Exception as e:
+            print(f'[history] {e}')
+
+    @commands.command(name='loop', brief="Loops a song for a number of cycles")
+    async def loop(self, ctx, n=1):
+        try:
+            self.loop = n
+
+            for s in range(self.loop):
+                self.queue.insert(1, self.current_song['link'])
+
+                await ctx.send(f"`📀Looped for {n} times> {self.current_song['name']}`")
+
+        except Exception as e:
+            print(f'[loop] {e}')
+
+    @commands.command(name='stoploop', brief="Stops a loop")
+    async def stoploop(self, ctx):
+        try:
+            self.queue = self.queue[self.loop:]
+
+            await ctx.send(f"`📀Stopped loop> {self.current_song['name']}`")
+
+        except Exception as e:
+            print(f'[stoploop] {e}')
 
 
 async def main():
