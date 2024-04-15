@@ -12,8 +12,8 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
-ban_words = list()
-roles = {'default': '', 'admin': '', 'additional': []}
+ban_words = []
+roles = {'default': '', 'admin': 'админ', 'additional': []}
 welcome_message = f'Привет!'
 
 
@@ -21,6 +21,7 @@ class JSTBotCL(discord.Client):
     voice_clients = {}
     yt_dl_options = {"format": "bestaudio/best"}
     ytdl = yt_dlp.YoutubeDL(yt_dl_options)
+    warns = {}
 
     ffmpeg_options = {'options': '-vn'}
 
@@ -61,6 +62,28 @@ class JSTBotCL(discord.Client):
             # roles checker sector end
 
             # ban words sector start
+            if message.content.startswith("$kick"):
+                if roles['admin'] in member_roles:
+                    try:
+                        # Getting a user mention for a kick
+                        user_to_kick = message.mentions[0]
+                        await user_to_kick.kick(reason="Requested by moderator")
+                        await message.channel.send(f"{user_to_kick.name} was kicked from the server.")
+                    except IndexError:
+                        await message.channel.send("The user was not mentioned for the kick.")
+                else:
+                    await message.channel.send("You do not have permission to use this command.")
+            if message.content.startswith("$ban"):
+                if roles['admin'] in member_roles:
+                    try:
+                        # Getting a user mention for a ban
+                        user_to_ban = message.mentions[0]
+                        await user_to_ban.ban(reason="Requested by moderator")
+                        await message.channel.send(f"{user_to_ban.name} was banned from the server.")
+                    except IndexError:
+                        await message.channel.send("The user was not mentioned for the kick.")
+                else:
+                    await message.channel.send("You do not have permission to use this command.")
             if message.content.startswith("$banwords add"):
                 try:
                     ban_words.append(message.content.split('$banwords add ')[1])
@@ -161,14 +184,72 @@ class JSTBotCL(discord.Client):
                     print(e)
             # roles sector end
 
+            # mute command
+            if message.content.startswith("$mute"):
+                try:
+                    user_to_mute = message.mentions[0]
+                    time_in_minutes = int(message.content.split("$mute ")[-1].split()[-1])
+
+                    # Check if the user is already muted
+                    muted_role = discord.utils.get(message.guild.roles, name="Muted")
+                    if muted_role in user_to_mute.roles:
+                        await message.channel.send("This user is already muted.")
+                        return
+
+                    # Create Muted role if it doesn't exist
+                    if muted_role is None:
+                        muted_role = await message.guild.create_role(name="Muted")
+
+                    await user_to_mute.add_roles(muted_role)
+                    await message.channel.send(
+                        f'{user_to_mute} was muted for {time_in_minutes} minutes.')
+                    await message.channel.set_permissions(user_to_mute, send_messages=False)
+                    await asyncio.sleep(time_in_minutes * 60)
+                    await message.channel.set_permissions(user_to_mute, send_messages=True)
+                    await user_to_mute.remove_roles(muted_role)  # Remove the Muted role after the mute duration
+                except Exception as e:
+                    print(e)
+            # unmute command
+            if message.content.startswith("$unmute"):
+                try:
+                    user_to_unmute = message.mentions[0]
+                    muted_role = discord.utils.get(message.guild.roles, name="Muted")
+
+                    if muted_role not in user_to_unmute.roles:
+                        await message.channel.send("This user is not muted.")
+                        return
+
+                    await message.channel.set_permissions(user_to_unmute, send_messages=True)
+                    await user_to_unmute.remove_roles(muted_role)
+                    await message.channel.send(f'{user_to_unmute} has been unmuted.')
+                except Exception as e:
+                    print(e)
         # check sector start
         if checkable is True:
             for ms in ban_words:
                 if message.author == self.user:
                     return
                 if ms in message.content.lower():
-                    await message.delete()
-                    await message.channel.send(f'Warning! Message includes banwords!')
+                    warnings = self.warns.get(message.author.id, 0)
+                    if warnings == 3:
+                        warnings = 0
+                    warnings += 1
+                    self.warns[message.author.id] = warnings
+                    if warnings == 3:
+                        user_to_mute = message.author
+                        muted_role = discord.utils.get(message.guild.roles, name="Muted")
+                        await user_to_mute.add_roles(muted_role)
+                        await message.channel.send(
+                            f'Warning! Message includes a banned word! {user_to_mute} was muted for 5 minutes.')
+                        await message.channel.set_permissions(user_to_mute, send_messages=False)
+                        await message.delete()
+                        await asyncio.sleep(300)
+                        await message.channel.set_permissions(user_to_mute, send_messages=True)
+                        await user_to_mute.remove_roles(muted_role)  # Remove the Muted role after the mute duration
+                        del self.warns[message.author.id]
+                    else:
+                        await message.delete()
+                        await message.channel.send(f'Warning! Message includes a banned word! Warning {warnings}/3')
         # check sector end
 
 
