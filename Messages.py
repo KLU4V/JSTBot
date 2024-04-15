@@ -13,7 +13,7 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 
 ban_words = []
-roles = {'default': '', 'admin': 'админ', 'additional': []}
+roles = {'default': '', 'admin': '', 'additional': []}
 welcome_message = f'Привет!'
 
 
