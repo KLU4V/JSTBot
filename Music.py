@@ -140,7 +140,13 @@ class JSTBotMusic(commands.Cog):
                     self.voice_clients[ctx.guild.id].play(player)
 
                     self.current_song['duration'] = time.strftime("%M:%S", time.gmtime(self.duration))
-                    await ctx.send(f"`📀Playing> {self.current_song['name']}`\n`📀Duration> {self.current_song['duration']}`")
+
+                    if self.duration != 0:
+                        await ctx.send(
+                            f"`📀Playing> {self.current_song['name']}`\n`📀Duration> {self.current_song['duration']}`")
+
+                    else:
+                        await ctx.send(f"`📀Playing> {self.current_song['name']}`")
 
                 except Exception as e:
                     print(f'[play_player] {e}')
@@ -171,8 +177,13 @@ class JSTBotMusic(commands.Cog):
                         self.voice_clients[ctx.guild.id].play(player)
 
                         self.current_song['duration'] = time.strftime("%M:%S", time.gmtime(self.duration))
-                        await ctx.send(
-                            f"`📀Playing> {self.current_song['name']}`\n`📀Duration> {self.current_song['duration']}`")
+
+                        if self.duration != 0:
+                            await ctx.send(
+                                f"`📀Playing> {self.current_song['name']}`\n`📀Duration> {self.current_song['duration']}`")
+
+                        else:
+                            await ctx.send(f"`📀Playing> {self.current_song['name']}`")
 
                     except Exception as e:
                         print(f'[play_player] {e}')
@@ -258,7 +269,7 @@ class JSTBotMusic(commands.Cog):
             self.queue.clear()
             self.paused = False
 
-            await ctx.send("`Stopped`")
+            await ctx.send(f"`📀Stopped> {self.current_song['name']}`")
         except Exception as e:
             print(e)
 
@@ -312,6 +323,232 @@ class JSTBotMusic(commands.Cog):
 
         except Exception as e:
             print(f'[stoploop] {e}')
+
+    @commands.command(name='remove', brief="Removes a specified song from the queue")
+    async def remove(self, ctx, n):
+        try:
+            n = int(n)
+
+            if 0 < n < len(self.queue):
+                self.queue.pop(n)
+
+            elif n == 0:
+                self.voice_clients[ctx.guild.id].stop()
+                self.queue.pop(n)
+
+                if len(self.queue) != 0:
+                    link = self.queue[0]
+                    song_info = Video.getInfo(link, mode=ResultMode.json)
+
+                    self.current_song['name'] = song_info['title']
+                    self.duration = int(song_info['duration']['secondsText'])
+                    self.current_song['link'] = link
+                    self.history.insert(0, self.current_song['link'])
+
+                    loop = asyncio.get_event_loop()
+                    data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
+
+                    song = data['url']
+                    player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options,
+                                                    executable='C:/Path_Programms/ffmpeg.exe')
+                    self.voice_clients[ctx.guild.id].play(player)
+
+                    self.current_song['duration'] = time.strftime("%M:%S", time.gmtime(self.duration))
+
+                    if self.duration != 0:
+                        await ctx.send(
+                            f"`📀Playing> {self.current_song['name']}`\n`📀Duration> {self.current_song['duration']}`")
+
+                    else:
+                        await ctx.send(f"`📀Playing> {self.current_song['name']}`")
+
+                else:
+                    await ctx.send(f"`📀Error> The queue is empty`")
+            else:
+                await ctx.send(f"`📀Error> Please enter a valid number`")
+
+        except Exception as e:
+            print(f'[remove] {e}')
+
+    @commands.command(name='chillradio', brief="Plays Chill Radio")
+    async def chillradio(self, ctx):
+        try:
+            channel = ctx.author.voice.channel
+            voice_client = await channel.connect()
+            self.voice_clients[voice_client.guild.id] = voice_client
+        except Exception as e:
+            print(f'[play] {e}')
+
+        try:
+            link = 'https://www.youtube.com/watch?v=jfKfPfyJRdk'
+
+            self.queue.append(link)
+
+            if not ctx.voice_client.is_playing():
+                try:
+                    link = self.queue[0]
+                    song_info = Video.getInfo(link, mode=ResultMode.json)
+
+                    self.current_song['name'] = song_info['title']
+                    self.duration = int(song_info['duration']['secondsText'])
+                    self.current_song['link'] = link
+                    self.history.insert(0, self.current_song['link'])
+
+                    loop = asyncio.get_event_loop()
+                    data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
+
+                    song = data['url']
+                    player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options,
+                                                    executable='C:/Path_Programms/ffmpeg.exe')
+                    self.voice_clients[ctx.guild.id].play(player)
+
+                    self.current_song['duration'] = time.strftime("%M:%S", time.gmtime(self.duration))
+
+                    await ctx.send(f"`📀Playing> {self.current_song['name']}`")
+
+                except Exception as e:
+                    print(f'[chillradio] {e}')
+
+            else:
+                await ctx.send(f"`📀Queued> {link}`")
+
+        except Exception as e:
+            print(f'[chillradio] {e}')
+
+    @commands.command(name='synthwaveradio', brief="Plays Synthwave Radio")
+    async def synthwaveradio(self, ctx):
+        try:
+            channel = ctx.author.voice.channel
+            voice_client = await channel.connect()
+            self.voice_clients[voice_client.guild.id] = voice_client
+        except Exception as e:
+            print(f'[play] {e}')
+
+        try:
+            link = 'https://www.youtube.com/watch?v=4xDzrJKXOOY'
+
+            self.queue.append(link)
+
+            if not ctx.voice_client.is_playing():
+                try:
+                    link = self.queue[0]
+                    song_info = Video.getInfo(link, mode=ResultMode.json)
+
+                    self.current_song['name'] = song_info['title']
+                    self.duration = int(song_info['duration']['secondsText'])
+                    self.current_song['link'] = link
+                    self.history.insert(0, self.current_song['link'])
+
+                    loop = asyncio.get_event_loop()
+                    data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
+
+                    song = data['url']
+                    player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options,
+                                                    executable='C:/Path_Programms/ffmpeg.exe')
+                    self.voice_clients[ctx.guild.id].play(player)
+
+                    self.current_song['duration'] = time.strftime("%M:%S", time.gmtime(self.duration))
+
+                    await ctx.send(f"`📀Playing> {self.current_song['name']}`")
+
+                except Exception as e:
+                    print(f'[synthwaveradio] {e}')
+
+            else:
+                await ctx.send(f"`📀Queued> {link}`")
+
+        except Exception as e:
+            print(f'[synthwaveradio] {e}')
+
+    @commands.command(name='phonkradio', brief="Plays Phonk Radio")
+    async def phonkradio(self, ctx):
+        try:
+            channel = ctx.author.voice.channel
+            voice_client = await channel.connect()
+            self.voice_clients[voice_client.guild.id] = voice_client
+        except Exception as e:
+            print(f'[play] {e}')
+
+        try:
+            link = 'https://www.youtube.com/watch?v=vYP12zrfqn4'
+
+            self.queue.append(link)
+
+            if not ctx.voice_client.is_playing():
+                try:
+                    link = self.queue[0]
+                    song_info = Video.getInfo(link, mode=ResultMode.json)
+
+                    self.current_song['name'] = song_info['title']
+                    self.duration = int(song_info['duration']['secondsText'])
+                    self.current_song['link'] = link
+                    self.history.insert(0, self.current_song['link'])
+
+                    loop = asyncio.get_event_loop()
+                    data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
+
+                    song = data['url']
+                    player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options,
+                                                    executable='C:/Path_Programms/ffmpeg.exe')
+                    self.voice_clients[ctx.guild.id].play(player)
+
+                    self.current_song['duration'] = time.strftime("%M:%S", time.gmtime(self.duration))
+
+                    await ctx.send(f"`📀Playing> {self.current_song['name']}`")
+
+                except Exception as e:
+                    print(f'[phonkradio] {e}')
+
+            else:
+                await ctx.send(f"`📀Queued> {link}`")
+
+        except Exception as e:
+            print(f'[phonkradio] {e}')
+
+    @commands.command(name='rockradio', brief="Plays Rock Radio")
+    async def rockradio(self, ctx):
+        try:
+            channel = ctx.author.voice.channel
+            voice_client = await channel.connect()
+            self.voice_clients[voice_client.guild.id] = voice_client
+        except Exception as e:
+            print(f'[play] {e}')
+
+        try:
+            link = 'https://www.youtube.com/watch?v=tWTPGVIw1es'
+
+            self.queue.append(link)
+
+            if not ctx.voice_client.is_playing():
+                try:
+                    link = self.queue[0]
+                    song_info = Video.getInfo(link, mode=ResultMode.json)
+
+                    self.current_song['name'] = song_info['title']
+                    self.duration = int(song_info['duration']['secondsText'])
+                    self.current_song['link'] = link
+                    self.history.insert(0, self.current_song['link'])
+
+                    loop = asyncio.get_event_loop()
+                    data = await loop.run_in_executor(None, lambda: self.ytdl.extract_info(link, download=False))
+
+                    song = data['url']
+                    player = discord.FFmpegPCMAudio(song, **self.ffmpeg_options,
+                                                    executable='C:/Path_Programms/ffmpeg.exe')
+                    self.voice_clients[ctx.guild.id].play(player)
+
+                    self.current_song['duration'] = time.strftime("%M:%S", time.gmtime(self.duration))
+
+                    await ctx.send(f"`📀Playing> {self.current_song['name']}`")
+
+                except Exception as e:
+                    print(f'[rockradio] {e}')
+
+            else:
+                await ctx.send(f"`📀Queued> {link}`")
+
+        except Exception as e:
+            print(f'[rockradio] {e}')
 
 
 async def main():
