@@ -62,7 +62,7 @@ class JSTBotCL(discord.Client):
 
         if roles['admin'] in member_roles or roles['admin'] == '':
             # roles checker sector end
-            if message.content.startswith("$help"):
+            if message.content.startswith("$helpformoderators"):
                 try:
                     await message.channel.send("Kаждая команда вводится в формате $command:")
                     await message.channel.send(
@@ -312,8 +312,7 @@ class JSTBotCL(discord.Client):
                         lvl = await message.guild.create_role(name=f"level {mess // 20}")
                     await user_to_lvl.add_roles(lvl)
                     await message.channel.send(
-                        f'{user_to_lvl} receives a level {mess // 20} role for being active'
-                        f' and sending {mess} messages')
+                        f'`{user_to_lvl} получает уровень {mess // 20} за активность. Он отправил {mess} сообщений`')
                 self.msgs[message.author.id] = mess
             except Exception as e:
                 print(e)
