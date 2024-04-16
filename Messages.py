@@ -13,7 +13,7 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 
 ban_words = []
-roles = {'default': '', 'admin': '', 'additional': []}
+roles = {'default': '', 'admin': '', 'muted': '', 'additional': []}
 welcome_message = f'Привет!'
 
 
@@ -47,6 +47,7 @@ class JSTBotCL(discord.Client):
         global ban_words, roles
 
         checkable = True
+        text = ''
 
         # roles checker sector start
         if not message:
@@ -55,6 +56,7 @@ class JSTBotCL(discord.Client):
             channel = guild.get_channel(channel_id)
             if not channel:
                 channel = await guild.fetch_channel(channel_id)
+
         member = message.author
         member_roles = [role.name for role in member.roles]
 
@@ -107,33 +109,29 @@ class JSTBotCL(discord.Client):
                     print(e)
 
             # ban words sector start
-            if message.content.startswith("$kick "):
-                if roles['admin'] in member_roles:
-                    try:
-                        # Getting a user mention for a kick
-                        user_to_kick = message.mentions[0]
-                        await user_to_kick.kick(reason="Requested by moderator")
-                        await message.channel.send(f"{user_to_kick.name} was kicked from the server")
-                    except IndexError:
-                        await message.channel.send("The user was not mentioned for the kick")
-                else:
-                    await message.channel.send("You do not have permission to use this command")
+            if message.content.startswith("$kick"):
+                try:
+                    user_to_kick = message.mentions[0]
+                    await user_to_kick.kick(reason="Requested by moderator")
+                    await message.channel.send(f"`{user_to_kick.name} был исключён`")
+
+                except IndexError:
+                    await message.channel.send("`Вы не указали пользователя`")
+
             if message.content.startswith("$ban "):
-                if roles['admin'] in member_roles:
-                    try:
-                        # Getting a user mention for a ban
-                        user_to_ban = message.mentions[0]
-                        await user_to_ban.ban(reason="Requested by moderator")
-                        await message.channel.send(f"{user_to_ban.name} was banned from the server")
-                    except IndexError:
-                        await message.channel.send("The user was not mentioned for the ban")
-                else:
-                    await message.channel.send("You do not have permission to use this command")
+                try:
+                    user_to_ban = message.mentions[0]
+                    await user_to_ban.ban(reason="Requested by moderator")
+                    await message.channel.send(f"`{user_to_ban.name} был забанен`")
+
+                except IndexError:
+                    await message.channel.send("`Вы не указали пользователя`")
+
             if message.content.startswith("$banwords add"):
                 try:
                     ban_words.append(message.content.split('$banwords add ')[1])
                     await message.channel.send(
-                        f'Successfully added a new ban word: ' + message.content.split('$banwords add ')[1])
+                        f'`Успешно добавленно новое запрещённое слово: {message.content.split('$banwords add ')[1]}`')
                     checkable = False
                 except Exception as e:
                     print(e)
@@ -144,7 +142,7 @@ class JSTBotCL(discord.Client):
                     for word in to_add:
                         ban_words.append(word)
                     await message.channel.send(
-                        f'Successfully added new ban words')
+                        f'`Успешно добавленны новые запрещённые слова`')
                     checkable = False
                 except Exception as e:
                     print(e)
@@ -152,11 +150,11 @@ class JSTBotCL(discord.Client):
             if message.content.startswith("$banwords remove"):
                 try:
                     if message.content.split('$banwords remove ')[1] not in ban_words:
-                        await message.channel.send('This word is not in banwords.')
+                        await message.channel.send(f'`Это слово не находится в списке запрещённых`')
                     else:
                         ban_words.pop(ban_words.index(message.content.split('$banwords remove ')[1]))
                         await message.channel.send(
-                            'Successfully removed a ban word: ' + message.content.split("$banwords remove ")[1])
+                            f'`Успешно удалено запрещённое слово: {message.content.split("$banwords remove ")[1]}`')
                     checkable = False
                 except Exception as e:
                     print(e)
@@ -164,9 +162,12 @@ class JSTBotCL(discord.Client):
             if message.content.startswith("$banwords list"):
                 try:
                     if bool(ban_words) is True:
-                        await message.channel.send(str(ban_words).strip('[]'))
+                        text = ''
+                        for w in ban_words:
+                            text += f'`{w}`\n'
+                        await message.channel.send(text)
                     else:
-                        await message.channel.send('Empty')
+                        await message.channel.send('`Empty`')
                     checkable = False
                 except Exception as e:
                     print(e)
@@ -186,10 +187,10 @@ class JSTBotCL(discord.Client):
 
                     roles['default'] = message.content.split("$roles default set ")[1]
                     if roles['default'] in server_roles:
-                        await message.channel.send(f'Default role: ' + roles['default'])
+                        await message.channel.send(f'`Default role: {roles['default']}`')
                     else:
                         roles['default'] = ''
-                        await message.channel.send('This role does not exist')
+                        await message.channel.send('`Эта роль не существует`')
                 except Exception as e:
                     print(e)
 
@@ -200,10 +201,10 @@ class JSTBotCL(discord.Client):
 
                     roles['admin'] = message.content.split("$roles admin set ")[1]
                     if roles['admin'] in server_roles:
-                        await message.channel.send(f'Admin role: ' + roles['admin'])
+                        await message.channel.send(f'`Admin role: {roles['admin']}`')
                     else:
                         roles['admin'] = ''
-                        await message.channel.send('This role does not exist')
+                        await message.channel.send('`Эта роль не существует`')
                 except Exception as e:
                     print(e)
 
@@ -215,74 +216,89 @@ class JSTBotCL(discord.Client):
                     roles['additional'].append(message.content.split("$roles additional add ")[1])
                     if message.content.split("$roles additional add ")[1] in server_roles:
                         await message.channel.send(
-                            f'Added an additional role: ' + message.content.split("$roles additional add ")[1])
+                            f'`Added an additional role: {message.content.split("$roles additional add ")[1]}`')
                     else:
                         roles['additional'].pop(-1)
-                        await message.channel.send('This role does not exist')
+                        await message.channel.send('`Эта роль не существует`')
+                except Exception as e:
+                    print(e)
+
+            if message.content.startswith("$roles muted set"):
+                try:
+                    guild = message.guild
+                    server_roles = [role.name for role in guild.roles]
+
+                    roles['muted'] = message.content.split("$roles muted set ")[1]
+                    if roles['muted'] in server_roles:
+                        await message.channel.send(f'`Muted role: {roles['muted']}`')
+                    else:
+                        roles['muted'] = ''
+                        await message.channel.send('`Эта роль не существует`')
                 except Exception as e:
                     print(e)
 
             if message.content.startswith("$roles list"):
                 try:
-                    await message.channel.send(roles)
+                    text = ''
+                    for key, value in roles.items():
+                        text += f'`{key}: {value}`\n'
+                    await message.channel.send(text)
                 except Exception as e:
                     print(e)
             # roles sector end
 
             # mute command
             if message.content.startswith("$mute"):
-                if roles['admin'] in member_roles:
+                try:
+                    user_to_mute = message.mentions[0]
                     try:
-                        user_to_mute = message.mentions[0]
                         time_in_minutes = int(message.content.split("$mute ")[-1].split()[-1])
 
-                        # Check if the user is already muted
-                        muted_role = discord.utils.get(message.guild.roles, name="Muted")
+                    except Exception as e:
+                        time_in_minutes = 1
+
+                    if roles['muted'] != '':
+                        muted_role = discord.utils.get(message.guild.roles, name=roles['muted'])
                         if muted_role in user_to_mute.roles:
-                            await message.channel.send("This user is already muted")
+                            await message.channel.send("`Этот пользователь уже заглушен`")
                             return
 
-                        # Create Muted role if it doesn't exist
-                        if muted_role is None:
-                            muted_role = await message.guild.create_role(name="Muted")
+                    elif discord.utils.get(message.guild.roles, name=roles['muted']):
+                        roles['muted'] = discord.utils.get(message.guild.roles, name=roles['muted'])
 
-                        await user_to_mute.add_roles(muted_role)
+                    else:
+                        roles['muted'] = await message.guild.create_role(name="Muted")
+
+                        await user_to_mute.add_roles(roles['muted'])
                         await message.channel.send(
-                            f'{user_to_mute} was muted for {time_in_minutes} minutes')
+                            f'`{user_to_mute} был заглушён на {time_in_minutes} минут`')
                         await message.channel.set_permissions(user_to_mute, send_messages=False)
                         await asyncio.sleep(time_in_minutes * 60)
                         await message.channel.set_permissions(user_to_mute, send_messages=True)
-                        await user_to_mute.remove_roles(muted_role)  # Remove the Muted role after the mute duration
-                    except Exception as e:
-                        print(e)
-            # unmute command
-            if message.content.startswith("$unmute"):
-                if roles['admin'] in member_roles:
-                    try:
-                        user_to_unmute = message.mentions[0]
-                        muted_role = discord.utils.get(message.guild.roles, name="Muted")
+                        await user_to_mute.remove_roles(roles['muted'])
 
-                        if muted_role not in user_to_unmute.roles:
-                            await message.channel.send("This user is not muted")
+                except Exception as e:
+                    print(e)
+
+            if message.content.startswith("$unmute"):
+                try:
+                    if roles['muted'] != '':
+                        user_to_unmute = message.mentions[0]
+
+                        if roles['muted'] not in user_to_unmute.roles:
+                            await message.channel.send("`Этот пользователь не был заглушен`")
                             return
 
                         await message.channel.set_permissions(user_to_unmute, send_messages=True)
-                        await user_to_unmute.remove_roles(muted_role)
-                        await message.channel.send(f'{user_to_unmute} has been unmuted')
-                    except Exception as e:
-                        print(e)
-            if message.content.startswith("$muted list"):
-                try:
-                    muted_role = discord.utils.get(message.guild.roles, name="Muted")
-                    muted_members = [member.display_name for member in message.guild.members if
-                                     muted_role in member.roles]
-                    if muted_members:
-                        await message.channel.send("Users with Muted role: " + ', '.join(muted_members))
+                        await user_to_unmute.remove_roles(roles['muted'])
+                        await message.channel.send(f'`{user_to_unmute} был разглушен`')
+
                     else:
-                        await message.channel.send("Empty")
+                        await message.channel.send("`На этом сервере нет роли для мута`")
                 except Exception as e:
                     print(e)
-        # here
+
+        # check sector start
         if '$' not in message.content:
             try:
                 if message.author == self.user:
@@ -301,7 +317,7 @@ class JSTBotCL(discord.Client):
                 self.msgs[message.author.id] = mess
             except Exception as e:
                 print(e)
-        # check sector start
+
         if checkable is True:
             for ms in ban_words:
                 if message.author == self.user:
@@ -317,16 +333,17 @@ class JSTBotCL(discord.Client):
                         muted_role = discord.utils.get(message.guild.roles, name="Muted")
                         await user_to_mute.add_roles(muted_role)
                         await message.channel.send(
-                            f'Warning! Message includes a banned word! {user_to_mute} was muted for 5 minutes')
+                            f'`Внимание! В сообщении есть запрещённые слова! {user_to_mute} был заглушен на 5 минут`')
                         await message.channel.set_permissions(user_to_mute, send_messages=False)
                         await message.delete()
                         await asyncio.sleep(300)
                         await message.channel.set_permissions(user_to_mute, send_messages=True)
-                        await user_to_mute.remove_roles(muted_role)  # Remove the Muted role after the mute duration
+                        await user_to_mute.remove_roles(muted_role)
                         del self.warns[message.author.id]
                     else:
                         await message.delete()
-                        await message.channel.send(f'Warning! Message includes a banned word! Warning {warnings}/3')
+                        await message.channel.send(
+                            f'`Предупреждение! В сообщении есть запрещённые слова! Предупреждения {warnings}/3`')
         # check sector end
 
 
