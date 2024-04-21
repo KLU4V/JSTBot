@@ -111,7 +111,7 @@ class JSTBotMusic(commands.Cog):
                 link = self.queue[0]
 
             elif request[:5] != 'https':
-                song_info = CustomSearch(request, VideoSortOrder.relevance, limit=1)
+                song_info = CustomSearch(request, VideoSortOrder.viewCount, limit=1)
                 link = song_info.result()['result'][0]['link']
 
                 self.queue.append(link)
@@ -249,7 +249,12 @@ class JSTBotMusic(commands.Cog):
             text = ""
             for s in self.queue:
                 text += f'`📀{Video.getInfo(s, mode=ResultMode.json)['title']}`\n'
-            await ctx.send(text)
+
+            if text != "":
+                await ctx.send(text)
+
+            else:
+                await ctx.send('`📀Nothing`')
 
         except Exception as e:
             print(f'[playlist_show] {e}')

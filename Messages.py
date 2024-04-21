@@ -329,15 +329,15 @@ class JSTBotCL(discord.Client):
                     self.warns[message.author.id] = warnings
                     if warnings == 3:
                         user_to_mute = message.author
-                        muted_role = discord.utils.get(message.guild.roles, name="Muted")
-                        await user_to_mute.add_roles(muted_role)
+                        roles['muted'] = discord.utils.get(message.guild.roles, name="Muted")
+                        await user_to_mute.add_roles(roles['muted'])
                         await message.channel.send(
                             f'`Внимание! В сообщении есть запрещённые слова! {user_to_mute} был заглушен на 5 минут`')
                         await message.channel.set_permissions(user_to_mute, send_messages=False)
                         await message.delete()
                         await asyncio.sleep(300)
                         await message.channel.set_permissions(user_to_mute, send_messages=True)
-                        await user_to_mute.remove_roles(muted_role)
+                        await user_to_mute.remove_roles(roles['muted'])
                         del self.warns[message.author.id]
                     else:
                         await message.delete()
