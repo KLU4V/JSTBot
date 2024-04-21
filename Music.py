@@ -102,7 +102,7 @@ class JSTBotMusic(commands.Cog):
             print(f'[play] {e}')
 
         try:
-            if request[:5] == 'https' and 'playlist' in request:
+            if request[:5] == 'https' and 'list' in request:
                 playlistVideos = Playlist.getVideos(request)
 
                 for i in range(len(playlistVideos['videos'])):
